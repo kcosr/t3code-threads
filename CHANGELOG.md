@@ -1,0 +1,16 @@
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Add a repo-local `t3code-threads` assistant skill for agent-driven thread
+  inspection and follow-up workflows.
+- Initial `t3code-threads` release.
+
+### Changed
+
+- Treat T3 goal and active-turn steering as documented upstream gaps rather than
+  unsupported CLI commands.
+- Align documented live smoke dependency installation with `smoke/README.md`.
+- Include `skills/` in documented release archive contents.

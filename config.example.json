@@ -1,0 +1,11 @@
+{
+  "defaultProviderInstance": "codex",
+  "defaultModel": "gpt-5.5",
+  "defaultEffort": "high",
+  "servers": {
+    "local": {
+      "httpUrl": "http://127.0.0.1:3773",
+      "bearerTokenEnv": "T3CODE_THREADS_TOKEN"
+    }
+  }
+}

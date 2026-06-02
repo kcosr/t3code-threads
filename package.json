@@ -1,0 +1,72 @@
+{
+  "name": "t3code-threads",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone Bun/TypeScript CLI for controlling upstream T3 Code threads.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/kcosr/t3code-threads.git"
+  },
+  "engines": {
+    "bun": ">=1.3.3",
+    "node": ">=20"
+  },
+  "workspaces": {
+    "packages": ["../t3code/packages/contracts", "../t3code/packages/client-runtime", "../t3code/packages/shared"],
+    "catalog": {
+      "effect": "4.0.0-beta.73",
+      "@effect/platform-bun": "4.0.0-beta.73",
+      "@effect/platform-node": "4.0.0-beta.73",
+      "@effect/platform-node-shared": "4.0.0-beta.73",
+      "@effect/vitest": "4.0.0-beta.73",
+      "@types/node": "^24.10.13",
+      "vitest": "^4.0.0"
+    }
+  },
+  "bin": {
+    "t3code-threads": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outfile=dist/t3code-threads.bundle.js",
+    "build:exe": "mkdir -p bin && bun build src/index.ts --compile --outfile=bin/t3code-threads",
+    "build:exe:linux-x64": "mkdir -p bin/release && bun build src/index.ts --compile --target=bun-linux-x64 --outfile=bin/release/t3code-threads-linux-x64",
+    "build:exe:macos-arm64": "mkdir -p bin/release && bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=bin/release/t3code-threads-macos-arm64",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint --error-on-warnings .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint-staged": "lint-staged",
+    "check": "bun run typecheck && bun run lint && bun run test",
+    "verify": "bun run check && bun run smoke:mock && bun run build && bun run build:exe",
+    "test": "bun test",
+    "smoke:mock": "bun run smoke/mock-smoke.ts",
+    "smoke:live": "bash smoke/live-smoke.sh",
+    "release": "node scripts/release.mjs",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "!{dist,bin,node_modules}/**/*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,md}": [
+      "biome format --write --files-ignore-unknown=true --no-errors-on-unmatched"
+    ]
+  },
+  "dependencies": {
+    "@t3tools/client-runtime": "workspace:*",
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/shared": "workspace:*",
+    "effect": "4.0.0-beta.73"
+  },
+  "patchedDependencies": {
+    "effect@4.0.0-beta.73": "../t3code/patches/effect@4.0.0-beta.73.patch"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.3.11",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "typescript": "~6.0.3"
+  }
+}
