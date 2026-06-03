@@ -22,7 +22,7 @@ const REPO = process.env.GITHUB_REPOSITORY ?? "kcosr/t3code-threads";
 const RELEASE_BRANCH = "main";
 const RELEASE_ARG = process.argv[2];
 const BUMP_ARGS = new Set(["major", "minor", "patch"]);
-const VERSION_ARG = /^\d+\.\d+\.\d+(-[\w.]+)?$/;
+const VERSION_ARG = /^\d+\.\d+\.\d+$/;
 const packageJsonPath = join(ROOT, "package.json");
 const bunLockPath = join(ROOT, "bun.lock");
 const changelogPath = join(ROOT, "CHANGELOG.md");
@@ -90,18 +90,17 @@ function getVersion() {
 }
 
 function parseVersion(version) {
-  const match = version.match(/^(\d+)\.(\d+)\.(\d+)(.*)$/);
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
   if (!match) return null;
   return {
     major: Number.parseInt(match[1], 10),
     minor: Number.parseInt(match[2], 10),
     patch: Number.parseInt(match[3], 10),
-    suffix: match[4] || "",
   };
 }
 
 function formatVersion(parts) {
-  return `${parts.major}.${parts.minor}.${parts.patch}${parts.suffix}`;
+  return `${parts.major}.${parts.minor}.${parts.patch}`;
 }
 
 function bumpVersion(currentVersion, bumpArg) {
@@ -121,7 +120,6 @@ function bumpVersion(currentVersion, bumpArg) {
     parts.minor = 0;
     parts.patch = 0;
   }
-  parts.suffix = "";
   return formatVersion(parts);
 }
 
@@ -150,6 +148,21 @@ function ensureTools() {
   run("node --version", { silent: true });
   run("bun --version", { silent: true });
   run("gh --version", { silent: true });
+  run("gh auth status --hostname github.com", { silent: true });
+}
+
+function ensureSyncedMain() {
+  runFile("git", ["fetch", "origin", `refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}`], {
+    silent: true,
+  });
+  const local = runFile("git", ["rev-parse", RELEASE_BRANCH], { silent: true }).trim();
+  const remote = runFile("git", ["rev-parse", `origin/${RELEASE_BRANCH}`], {
+    silent: true,
+  }).trim();
+  if (local !== remote) {
+    console.error(`Error: ${RELEASE_BRANCH} must match origin/${RELEASE_BRANCH}. Run git pull --ff-only first.`);
+    process.exit(1);
+  }
 }
 
 function ensureTagAvailable(version) {
@@ -161,11 +174,18 @@ function ensureTagAvailable(version) {
     console.error(`Error: tag v${version} already exists.`);
     process.exit(1);
   }
+
+  const remoteTagExists = run(`git ls-remote --tags origin refs/tags/v${version}`, {
+    silent: true,
+  });
+  if (remoteTagExists?.trim()) {
+    console.error(`Error: tag v${version} already exists on origin.`);
+    process.exit(1);
+  }
 }
 
-function updateChangelogForRelease(version) {
-  const date = new Date().toISOString().split("T")[0];
-  let content = readFileSync(changelogPath, "utf-8");
+function readValidatedChangelogForRelease(version) {
+  const content = readFileSync(changelogPath, "utf-8");
   if (!content.includes("## [Unreleased]")) {
     console.error("Error: No [Unreleased] section found in CHANGELOG.md");
     process.exit(1);
@@ -175,10 +195,20 @@ function updateChangelogForRelease(version) {
     process.exit(1);
   }
   const unreleasedMatch = content.match(/## \[Unreleased\]\n([\s\S]*?)(?=\n## \[|$)/);
-  if (!unreleasedMatch || unreleasedMatch[1].trim() === "_No unreleased changes._") {
+  if (!unreleasedMatch || !unreleasedMatch[1].trim() || unreleasedMatch[1].trim() === "_No unreleased changes._") {
     console.error("Error: CHANGELOG.md has no release notes under [Unreleased]");
     process.exit(1);
   }
+  return content;
+}
+
+function validateChangelogForRelease(version) {
+  readValidatedChangelogForRelease(version);
+}
+
+function updateChangelogForRelease(version) {
+  const date = new Date().toISOString().split("T")[0];
+  let content = readValidatedChangelogForRelease(version);
   content = content.replace(/## \[Unreleased\]/, `## [${version}] - ${date}`);
   writeFileSync(changelogPath, content, "utf-8");
 }
@@ -197,7 +227,12 @@ function extractReleaseNotes(version) {
 
 function addUnreleasedSection() {
   let content = readFileSync(changelogPath, "utf-8");
+  const original = content;
   content = content.replace("# Changelog\n\n", "# Changelog\n\n## [Unreleased]\n\n_No unreleased changes._\n\n");
+  if (content === original) {
+    console.error("Error: Could not add [Unreleased] section to CHANGELOG.md");
+    process.exit(1);
+  }
   writeFileSync(changelogPath, content, "utf-8");
 }
 
@@ -206,7 +241,9 @@ const version = RELEASE_ARG === "current" ? currentVersion : bumpVersion(current
 
 ensureCleanMain();
 ensureTools();
+ensureSyncedMain();
 ensureTagAvailable(version);
+validateChangelogForRelease(version);
 
 if (version !== currentVersion) {
   updatePackageVersion(version);
@@ -221,8 +258,7 @@ if (existsSync(bunLockPath)) releaseFiles.push("bun.lock");
 runFile("git", ["add", ...releaseFiles]);
 runFile("git", ["commit", "-m", `Release v${version}`]);
 runFile("git", ["tag", `v${version}`]);
-run("git push origin main");
-run(`git push origin v${version}`);
+runFile("git", ["push", "--atomic", "origin", RELEASE_BRANCH, `v${version}`]);
 
 const notes = extractReleaseNotes(version);
 runFile("gh", ["release", "create", `v${version}`, "--repo", REPO, "--title", `v${version}`, "--notes", notes]);
@@ -230,4 +266,4 @@ runFile("gh", ["release", "create", `v${version}`, "--repo", REPO, "--title", `v
 addUnreleasedSection();
 runFile("git", ["add", "CHANGELOG.md"]);
 runFile("git", ["commit", "-m", "Open changelog for next cycle"]);
-run("git push origin main");
+runFile("git", ["push", "origin", RELEASE_BRANCH]);
