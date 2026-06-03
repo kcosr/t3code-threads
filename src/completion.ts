@@ -297,10 +297,10 @@ function bashCompletionScript(): string {
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
   words=("\${COMP_WORDS[@]:1:COMP_CWORD-1}")
-  COMPREPLY=( $(compgen -W "$(t3code-threads __complete -- "$cur" "\${words[@]}" 2>/dev/null)" -- "$cur") )
+  mapfile -t COMPREPLY < <(t3code-threads __complete -- "$cur" "\${words[@]}" 2>/dev/null)
 }
 
-complete -F _t3code_threads_completion t3code-threads
+complete -o bashdefault -o default -F _t3code_threads_completion t3code-threads
 `;
 }
 

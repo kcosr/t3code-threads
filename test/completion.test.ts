@@ -66,7 +66,9 @@ describe("shell completion", () => {
   });
 
   test("generates bash, zsh, and fish scripts that delegate to __complete", () => {
-    expect(completionScript("bash")).toContain("complete -F _t3code_threads_completion t3code-threads");
+    expect(completionScript("bash")).toContain(
+      "complete -o bashdefault -o default -F _t3code_threads_completion t3code-threads",
+    );
     expect(completionScript("bash")).toContain('t3code-threads __complete -- "$cur"');
     expect(completionScript("zsh")).toContain("compdef _t3code_threads t3code-threads");
     expect(completionScript("zsh")).toContain('t3code-threads __complete -- "$current"');
