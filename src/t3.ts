@@ -259,7 +259,10 @@ export async function waitForTurn(input: {
         if (reduced.kind === "updated") currentThread = reduced.thread;
       }
       if (!currentThread) return;
-      if (input.messageId) observedTurnId = observedActiveTurnId(currentThread) ?? observedTurnId;
+      if (input.messageId) {
+        const activeTurnId = observedActiveTurnId(currentThread);
+        if (activeTurnId) observedTurnId = activeTurnId;
+      }
       const nextAssistantText = collectAssistantText(currentThread, input.messageId);
       if (!commandAccepted) {
         assistantText = nextAssistantText;
@@ -427,8 +430,6 @@ function terminalStatusAfterMessage(
   if (messageStartIndex(thread, messageId) === null) return null;
   if (thread.session?.status === "running" || thread.session?.status === "starting") return null;
   if (hasCompletedAssistantResponseAfterMessage(thread, messageId)) return "completed";
-  if (thread.session?.status === "interrupted") return "interrupted";
-  if (thread.session?.status === "error") return "error";
 
   const turnId =
     latestAssistantTurnIdAfterMessage(thread, messageId) ?? userMessageTurnId(thread, messageId) ?? observedTurnId;
@@ -438,16 +439,19 @@ function terminalStatusAfterMessage(
     if (thread.latestTurn.state === "error") return "error";
   }
 
+  if (observedTurnId && thread.session?.activeTurnId === observedTurnId) {
+    if (thread.session.status === "interrupted") return "interrupted";
+    if (thread.session.status === "error") return "error";
+  }
+
   return null;
 }
 
 function observedActiveTurnId(thread: OrchestrationThread): string | null {
-  if (thread.session?.activeTurnId) return thread.session.activeTurnId;
-  if (
-    thread.latestTurn?.state === "running" ||
-    thread.latestTurn?.state === "interrupted" ||
-    thread.latestTurn?.state === "error"
-  ) {
+  if (thread.session?.activeTurnId && (thread.session.status === "running" || thread.session.status === "starting")) {
+    return thread.session.activeTurnId;
+  }
+  if (thread.latestTurn?.state === "running") {
     return thread.latestTurn.turnId;
   }
   return null;

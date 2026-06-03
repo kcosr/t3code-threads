@@ -152,18 +152,100 @@ describe("t3 helpers", () => {
     expect(terminalStatus(thread, "message-new-user")).toBeNull();
   });
 
-  test("reports interrupted and error session states for a message wait", () => {
+  test("does not complete a message wait from stale prior terminal session states", () => {
     const interrupted = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-prior"),
+        state: "interrupted",
+        requestedAt: "2026-06-02T00:00:00.000Z",
+        startedAt: "2026-06-02T00:00:00.000Z",
+        completedAt: "2026-06-02T00:00:02.000Z",
+        assistantMessageId: null,
+      },
+      session: sessionFixture("interrupted", "turn-prior"),
+      messages: [
+        userMessage("message-prior-user", "turn-prior", "before"),
+        userMessage("message-new-user", null, "again"),
+      ],
+    });
+    const errored = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-prior"),
+        state: "error",
+        requestedAt: "2026-06-02T00:00:00.000Z",
+        startedAt: "2026-06-02T00:00:00.000Z",
+        completedAt: "2026-06-02T00:00:02.000Z",
+        assistantMessageId: null,
+      },
+      session: sessionFixture("error", "turn-prior"),
+      messages: [
+        userMessage("message-prior-user", "turn-prior", "before"),
+        userMessage("message-new-user", null, "again"),
+      ],
+    });
+
+    expect(terminalStatus(interrupted, "message-new-user")).toBeNull();
+    expect(terminalStatus(errored, "message-new-user")).toBeNull();
+  });
+
+  test("reports interrupted and error states attributed to the message turn", () => {
+    const interrupted = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-new"),
+        state: "interrupted",
+        requestedAt: "2026-06-02T00:00:03.000Z",
+        startedAt: "2026-06-02T00:00:04.000Z",
+        completedAt: "2026-06-02T00:00:05.000Z",
+        assistantMessageId: null,
+      },
       session: sessionFixture("interrupted"),
       messages: [userMessage("message-new-user", "turn-new", "again")],
     });
     const errored = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-new"),
+        state: "error",
+        requestedAt: "2026-06-02T00:00:03.000Z",
+        startedAt: "2026-06-02T00:00:04.000Z",
+        completedAt: "2026-06-02T00:00:05.000Z",
+        assistantMessageId: null,
+      },
       session: sessionFixture("error"),
       messages: [userMessage("message-new-user", "turn-new", "again")],
     });
 
     expect(terminalStatus(interrupted, "message-new-user")).toBe("interrupted");
     expect(terminalStatus(errored, "message-new-user")).toBe("error");
+  });
+
+  test("reports observed interrupted and error states for a message without a turn id", () => {
+    const interrupted = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-new"),
+        state: "interrupted",
+        requestedAt: "2026-06-02T00:00:03.000Z",
+        startedAt: "2026-06-02T00:00:04.000Z",
+        completedAt: "2026-06-02T00:00:05.000Z",
+        assistantMessageId: null,
+      },
+      session: sessionFixture("interrupted"),
+      messages: [userMessage("message-new-user", null, "again")],
+    });
+    const errored = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-new"),
+        state: "error",
+        requestedAt: "2026-06-02T00:00:03.000Z",
+        startedAt: "2026-06-02T00:00:04.000Z",
+        completedAt: "2026-06-02T00:00:05.000Z",
+        assistantMessageId: null,
+      },
+      session: sessionFixture("error"),
+      messages: [userMessage("message-new-user", null, "again")],
+    });
+
+    expect(terminalStatus(interrupted, "message-new-user", "turn-new")).toBe("interrupted");
+    expect(terminalStatus(errored, "message-new-user", "turn-new")).toBe("error");
   });
 
   test("reduces mock assistant message events", () => {
@@ -316,12 +398,12 @@ function threadFixture(
   };
 }
 
-function userMessage(id: string, turnId: string, text: string): OrchestrationThread["messages"][number] {
+function userMessage(id: string, turnId: string | null, text: string): OrchestrationThread["messages"][number] {
   return {
     id: MessageId.make(id),
     role: "user",
     text,
-    turnId: TurnId.make(turnId),
+    turnId: turnId ? TurnId.make(turnId) : null,
     streaming: false,
     createdAt: "2026-06-02T00:00:03.000Z",
     updatedAt: "2026-06-02T00:00:03.000Z",
