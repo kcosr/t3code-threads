@@ -437,11 +437,18 @@ function terminalStatusAfterMessage(
     if (thread.latestTurn.state === "completed") return "completed";
     if (thread.latestTurn.state === "interrupted") return "interrupted";
     if (thread.latestTurn.state === "error") return "error";
+    if (thread.latestTurn.state === "running") return null;
   }
 
   if (observedTurnId && thread.session?.activeTurnId === observedTurnId) {
     if (thread.session.status === "interrupted") return "interrupted";
     if (thread.session.status === "error") return "error";
+  }
+
+  if (observedTurnId && thread.session && thread.session.activeTurnId !== observedTurnId) {
+    if (thread.session.status === "interrupted") return "interrupted";
+    if (thread.session.status === "error" || thread.session.lastError) return "error";
+    return "completed";
   }
 
   return null;

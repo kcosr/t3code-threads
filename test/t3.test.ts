@@ -248,6 +248,30 @@ describe("t3 helpers", () => {
     expect(terminalStatus(errored, "message-new-user", "turn-new")).toBe("error");
   });
 
+  test("reports observed ended turns without a turn-bound terminal event", () => {
+    const interrupted = threadFixture({
+      session: sessionFixture("interrupted"),
+      messages: [userMessage("message-new-user", null, "again")],
+    });
+    const errored = threadFixture({
+      session: sessionFixture("error"),
+      messages: [userMessage("message-new-user", null, "again")],
+    });
+    const readyWithError = threadFixture({
+      session: sessionFixture("ready", undefined, "provider failed before turn diff"),
+      messages: [userMessage("message-new-user", null, "again")],
+    });
+    const completed = threadFixture({
+      session: sessionFixture("ready"),
+      messages: [userMessage("message-new-user", null, "again")],
+    });
+
+    expect(terminalStatus(interrupted, "message-new-user", "turn-new")).toBe("interrupted");
+    expect(terminalStatus(errored, "message-new-user", "turn-new")).toBe("error");
+    expect(terminalStatus(readyWithError, "message-new-user", "turn-new")).toBe("error");
+    expect(terminalStatus(completed, "message-new-user", "turn-new")).toBe("completed");
+  });
+
   test("reduces mock assistant message events", () => {
     const thread = {
       id: "thread-1",
@@ -425,6 +449,7 @@ function assistantMessage(id: string, turnId: string, text: string): Orchestrati
 function sessionFixture(
   status: NonNullable<OrchestrationThread["session"]>["status"],
   activeTurnId?: string,
+  lastError?: string | null,
 ): NonNullable<OrchestrationThread["session"]> {
   return {
     threadId: ThreadId.make("thread-terminal"),
@@ -432,7 +457,7 @@ function sessionFixture(
     providerName: "codex",
     runtimeMode: "full-access",
     activeTurnId: activeTurnId ? TurnId.make(activeTurnId) : null,
-    lastError: null,
+    lastError: lastError ?? null,
     updatedAt: "2026-06-02T00:00:04.000Z",
   };
 }
