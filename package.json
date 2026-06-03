@@ -34,6 +34,7 @@
     "build:exe": "mkdir -p bin && bun build src/index.ts --compile --outfile=bin/t3code-threads",
     "build:exe:linux-x64": "mkdir -p bin/release && bun build src/index.ts --compile --target=bun-linux-x64 --outfile=bin/release/t3code-threads-linux-x64",
     "build:exe:macos-arm64": "mkdir -p bin/release && bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile=bin/release/t3code-threads-macos-arm64",
+    "build:exe:macos-x64": "mkdir -p bin/release && bun build src/index.ts --compile --target=bun-darwin-x64 --outfile=bin/release/t3code-threads-macos-x64",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint --error-on-warnings .",
     "lint:fix": "biome lint --write .",

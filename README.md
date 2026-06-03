@@ -62,6 +62,7 @@ Supported release platforms are currently:
 
 - `linux-x64`
 - `macos-arm64`
+- `macos-x64`
 
 Install the extracted `t3code-threads` binary somewhere on your `PATH`, for
 example `~/.local/bin`:
@@ -515,6 +516,7 @@ provided or built by the release operator. Build release binaries with:
 ```bash
 bun run build:exe:linux-x64
 bun run build:exe:macos-arm64
+bun run build:exe:macos-x64
 ```
 
 Expected archive names:
@@ -522,6 +524,7 @@ Expected archive names:
 ```text
 t3code-threads-0.1.0-linux-x64.tar.gz
 t3code-threads-0.1.0-macos-arm64.tar.gz
+t3code-threads-0.1.0-macos-x64.tar.gz
 ```
 
 Each archive should contain one top-level directory named
@@ -558,7 +561,8 @@ upload the archives:
 RELEASE_TAG="v${VERSION}"
 gh release upload "$RELEASE_TAG" \
   "t3code-threads-${VERSION}-linux-x64.tar.gz" \
-  "t3code-threads-${VERSION}-macos-arm64.tar.gz"
+  "t3code-threads-${VERSION}-macos-arm64.tar.gz" \
+  "t3code-threads-${VERSION}-macos-x64.tar.gz"
 ```
 
 ## Project Structure
