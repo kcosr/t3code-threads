@@ -210,6 +210,7 @@ export async function waitForTurn(input: {
   let settled = false;
   let commandAccepted = input.dispatch === undefined;
   let unsubscribe: (() => void) | undefined;
+  let observedTurnId: string | null = null;
 
   const result = await new Promise<TurnWaitResult>((resolve, reject) => {
     let pollInFlight = false;
@@ -237,12 +238,13 @@ export async function waitForTurn(input: {
 
     const maybeFinish = (thread: OrchestrationThread) => {
       if (!commandAccepted) return;
-      const status = terminalStatus(thread, input.messageId);
+      const status = terminalStatus(thread, input.messageId, observedTurnId);
       if (!status) return;
       cleanup();
       resolve({
         threadId: input.threadId,
-        turnId: thread.latestTurn?.turnId ?? latestAssistantTurnIdAfterMessage(thread, input.messageId),
+        turnId:
+          observedTurnId ?? thread.latestTurn?.turnId ?? latestAssistantTurnIdAfterMessage(thread, input.messageId),
         status,
         assistantText,
       });
@@ -257,6 +259,7 @@ export async function waitForTurn(input: {
         if (reduced.kind === "updated") currentThread = reduced.thread;
       }
       if (!currentThread) return;
+      if (input.messageId) observedTurnId = observedActiveTurnId(currentThread) ?? observedTurnId;
       const nextAssistantText = collectAssistantText(currentThread, input.messageId);
       if (!commandAccepted) {
         assistantText = nextAssistantText;
@@ -395,8 +398,12 @@ function collectAssistantText(thread: OrchestrationThread, messageId?: string): 
   return assistant.map((message) => message.text).join("\n\n");
 }
 
-export function terminalStatus(thread: OrchestrationThread, messageId?: string): TurnWaitResult["status"] | null {
-  if (messageId) return terminalStatusAfterMessage(thread, messageId);
+export function terminalStatus(
+  thread: OrchestrationThread,
+  messageId?: string,
+  observedTurnId?: string | null,
+): TurnWaitResult["status"] | null {
+  if (messageId) return terminalStatusAfterMessage(thread, messageId, observedTurnId);
   if (thread.session?.status === "running" || thread.session?.status === "starting") return null;
   switch (thread.latestTurn?.state) {
     case "completed":
@@ -412,15 +419,21 @@ export function terminalStatus(thread: OrchestrationThread, messageId?: string):
   }
 }
 
-function terminalStatusAfterMessage(thread: OrchestrationThread, messageId: string): TurnWaitResult["status"] | null {
+function terminalStatusAfterMessage(
+  thread: OrchestrationThread,
+  messageId: string,
+  observedTurnId?: string | null,
+): TurnWaitResult["status"] | null {
   if (messageStartIndex(thread, messageId) === null) return null;
   if (thread.session?.status === "running" || thread.session?.status === "starting") return null;
   if (hasCompletedAssistantResponseAfterMessage(thread, messageId)) return "completed";
   if (thread.session?.status === "interrupted") return "interrupted";
   if (thread.session?.status === "error") return "error";
 
-  const assistantTurnId = latestAssistantTurnIdAfterMessage(thread, messageId);
-  if (assistantTurnId && thread.latestTurn?.turnId === assistantTurnId) {
+  const turnId =
+    latestAssistantTurnIdAfterMessage(thread, messageId) ?? userMessageTurnId(thread, messageId) ?? observedTurnId;
+  if (turnId && thread.latestTurn?.turnId === turnId) {
+    if (thread.latestTurn.state === "completed") return "completed";
     if (thread.latestTurn.state === "interrupted") return "interrupted";
     if (thread.latestTurn.state === "error") return "error";
   }
@@ -428,10 +441,26 @@ function terminalStatusAfterMessage(thread: OrchestrationThread, messageId: stri
   return null;
 }
 
+function observedActiveTurnId(thread: OrchestrationThread): string | null {
+  if (thread.session?.activeTurnId) return thread.session.activeTurnId;
+  if (
+    thread.latestTurn?.state === "running" ||
+    thread.latestTurn?.state === "interrupted" ||
+    thread.latestTurn?.state === "error"
+  ) {
+    return thread.latestTurn.turnId;
+  }
+  return null;
+}
+
 function messageStartIndex(thread: OrchestrationThread, messageId?: string): number | null {
   if (!messageId) return 0;
   const index = thread.messages.findIndex((message) => message.id === messageId);
   return index < 0 ? null : index + 1;
+}
+
+function userMessageTurnId(thread: OrchestrationThread, messageId: string): string | null {
+  return thread.messages.find((message) => message.id === messageId)?.turnId ?? null;
 }
 
 function hasCompletedAssistantResponseAfterMessage(thread: OrchestrationThread, messageId: string): boolean {

@@ -155,8 +155,8 @@ Most data/control commands require a bearer session token. Configure one through
 export T3CODE_THREADS_TOKEN=...
 ```
 
-Or exchange a one-time credential and persist the resulting bearer session in
-the config:
+Or exchange a one-time credential. For servers without `bearerTokenEnv`, the
+resulting bearer session is persisted in the config:
 
 ```bash
 t3code-threads auth login --server local --token ONE_TIME_TOKEN
@@ -164,7 +164,9 @@ t3code-threads auth login --server local --token ONE_TIME_TOKEN
 
 Config files written by `auth login` are stored under
 `~/.config/t3code-threads` with private permissions. For shared systems,
-prefer `bearerTokenEnv` so the token does not live in the config file.
+prefer `bearerTokenEnv` so the token does not live in the config file. When a
+server uses `bearerTokenEnv`, `auth login` does not write the returned bearer
+token into the config.
 
 Check auth:
 

@@ -177,22 +177,31 @@ async function authCommand(args: string[], config: AppConfig, configPath: string
     return session.authenticated ? 0 : 1;
   }
   if (sub === "login") {
-    const token = takeOption(args, "--token") ?? takeOption(args, "--credential");
+    const token = takeOption(args, "--token");
     const json = takeFlag(args, "--json");
     requireNoExtra(args);
     if (!token) throw new UsageError("auth login requires --token TOKEN");
     const result = await bootstrapBearerSession({ httpUrl: target.config.httpUrl, credential: token });
-    if (!base.connect && target.name in config.servers) {
+    const saveInlineToken = !base.connect && target.name in config.servers && !target.config.bearerTokenEnv;
+    if (saveInlineToken) {
       await saveConfig(configPath, setServerToken(config, target.name, result.sessionToken));
     }
     if (json)
-      printJson({ server: target.name, authenticated: true, role: result.role, sessionMethod: result.sessionMethod });
+      printJson({
+        server: target.name,
+        authenticated: true,
+        role: result.role,
+        sessionMethod: result.sessionMethod,
+        saved: saveInlineToken,
+        ...(target.config.bearerTokenEnv ? { bearerTokenEnv: target.config.bearerTokenEnv } : {}),
+      });
     else
       printKeyValues([
         ["server", target.name],
         ["authenticated", "yes"],
         ["role", result.role],
-        ["saved", base.connect ? "no" : "yes"],
+        ["saved", saveInlineToken ? "yes" : "no"],
+        ...(target.config.bearerTokenEnv ? ([["bearerTokenEnv", target.config.bearerTokenEnv]] as const) : []),
       ]);
     return 0;
   }

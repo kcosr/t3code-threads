@@ -118,6 +118,23 @@ describe("t3 helpers", () => {
     expect(terminalStatus(thread, "message-new-user")).toBe("completed");
   });
 
+  test("completes a textless message wait when the latest turn matches the user message turn", () => {
+    const thread = threadFixture({
+      latestTurn: {
+        turnId: TurnId.make("turn-new"),
+        state: "completed",
+        requestedAt: "2026-06-02T00:00:03.000Z",
+        startedAt: "2026-06-02T00:00:04.000Z",
+        completedAt: "2026-06-02T00:00:05.000Z",
+        assistantMessageId: null,
+      },
+      session: sessionFixture("ready"),
+      messages: [userMessage("message-new-user", "turn-new", "again")],
+    });
+
+    expect(terminalStatus(thread, "message-new-user")).toBe("completed");
+  });
+
   test("keeps a message wait open while the session is running", () => {
     const thread = threadFixture({
       latestTurn: {
