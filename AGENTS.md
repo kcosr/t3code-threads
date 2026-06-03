@@ -107,7 +107,7 @@ node scripts/release.mjs 0.2.3    # Explicit version
 The release script verifies a clean `main` branch, optionally bumps
 `package.json`, refreshes the Bun lockfile, runs local checks, stamps
 `CHANGELOG.md`, commits and tags the release, pushes to origin, creates a GitHub
-prerelease from changelog notes, then opens a new `## [Unreleased]` section for
+release from changelog notes, then opens a new `## [Unreleased]` section for
 the next cycle.
 
 Release binaries are built and packaged manually after the GitHub release exists.

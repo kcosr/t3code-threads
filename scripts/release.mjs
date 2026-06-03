@@ -225,18 +225,7 @@ run("git push origin main");
 run(`git push origin v${version}`);
 
 const notes = extractReleaseNotes(version);
-runFile("gh", [
-  "release",
-  "create",
-  `v${version}`,
-  "--repo",
-  REPO,
-  "--prerelease",
-  "--title",
-  `v${version}`,
-  "--notes",
-  notes,
-]);
+runFile("gh", ["release", "create", `v${version}`, "--repo", REPO, "--title", `v${version}`, "--notes", notes]);
 
 addUnreleasedSection();
 runFile("git", ["add", "CHANGELOG.md"]);
