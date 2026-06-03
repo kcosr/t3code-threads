@@ -42,21 +42,26 @@ import { isAtOrAfter, nowIso, parseSince } from "./time.ts";
 import type { AppConfig, ResolvedTarget, T3Connection } from "./types.ts";
 import { requireArg, requireNoExtra, takeFlag, takeNumber, takeOption } from "./args.ts";
 
-const RUNTIME_MODES = [
+export const RUNTIME_MODES = [
   "approval-required",
   "auto-accept-edits",
   "full-access",
 ] as const satisfies ReadonlyArray<RuntimeMode>;
-const INTERACTION_MODES = ["default", "plan"] as const satisfies ReadonlyArray<ProviderInteractionMode>;
+export const INTERACTION_MODES = ["default", "plan"] as const satisfies ReadonlyArray<ProviderInteractionMode>;
+export const SORT_KEYS = ["updated", "created"] as const;
+export const SHOW_ITEM_VIEWS = ["summary", "full", "none"] as const;
+export const MESSAGE_ROLES = ["user", "assistant"] as const;
 const SEARCH_DETAIL_CONCURRENCY = 12;
 
-interface BaseInput {
+export interface BaseInput {
   readonly configPath?: string;
   readonly connect?: string;
   readonly server?: string;
 }
 
-export async function runCommand(command: string, rawArgs: ReadonlyArray<string>, base: BaseInput): Promise<number> {
+export type CommandRunner = (command: string, rawArgs: ReadonlyArray<string>, base: BaseInput) => Promise<number>;
+
+export const runCommand: CommandRunner = async (command, rawArgs, base) => {
   if (command === "help") {
     printHelp();
     return 0;
@@ -107,7 +112,7 @@ export async function runCommand(command: string, rawArgs: ReadonlyArray<string>
     default:
       throw new UsageError(`unknown command ${command}`);
   }
-}
+};
 
 async function serversCommand(args: string[], config: AppConfig, configPath: string, base: BaseInput): Promise<number> {
   const sub = args[0];

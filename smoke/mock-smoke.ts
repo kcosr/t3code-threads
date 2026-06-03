@@ -179,6 +179,26 @@ try {
   );
 
   await run(configPath, ["servers", "ping"]);
+  const completionHelp = await run(configPath, ["completion", "bash"]);
+  assertIncludes(completionHelp.stdout, "source <(t3code-threads completion script bash)", "completion instructions");
+  const completionScript = await run(configPath, ["completion", "script", "bash"]);
+  assertIncludes(
+    completionScript.stdout,
+    "complete -F _t3code_threads_completion t3code-threads",
+    "bash completion script",
+  );
+  const listCompletion = await run(configPath, ["__complete", "--", "l"]);
+  assertIncludes(listCompletion.stdout, "list\n", "top-level completion");
+  const serverCompletion = await run(configPath, [
+    "__complete",
+    "--",
+    "mo",
+    "--config",
+    configPath,
+    "list",
+    "--server",
+  ]);
+  assertIncludes(serverCompletion.stdout, "mock\n", "server completion");
   await run(configPath, ["auth", "status"]);
   await run(configPath, ["models"]);
   await run(configPath, ["providers", "list"]);

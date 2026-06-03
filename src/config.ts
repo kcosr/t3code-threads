@@ -108,6 +108,11 @@ export function listConfiguredServers(config: AppConfig) {
   }));
 }
 
+export async function serverNameCandidates(explicitConfigPath?: string): Promise<string[]> {
+  const config = await loadConfig(resolveConfigPath(explicitConfigPath));
+  return Object.keys(config.servers);
+}
+
 export function setServerToken(config: AppConfig, serverName: string, token: string): AppConfig {
   const server = config.servers[serverName];
   if (!server) throw new UsageError(`unknown server ${serverName}`);

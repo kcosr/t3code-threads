@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add shell completion setup and generated bash, zsh, and fish completion
+  scripts.
+
+### Changed
+
+- Migrate CLI command parsing to Commander while preserving practical placement
+  for global `--config`, `--connect`, and `--server` options.
+
 ### Fixed
 
 - Improved release-script preflight checks, diagnostics, and changelog validation edge cases.

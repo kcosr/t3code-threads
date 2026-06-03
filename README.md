@@ -295,6 +295,7 @@ unless explicit provider/model/runtime flags are passed.
 | `name THREAD_ID NAME` | Set a thread title. |
 | `archive THREAD_ID` / `unarchive THREAD_ID` | Archive or restore a thread. |
 | `settings show THREAD_ID` | Show T3 thread model/runtime settings. |
+| `completion [SHELL]` | Print shell completion setup instructions for `bash`, `zsh`, or `fish`. |
 
 Global options `--config PATH`, `--connect URL`, and `--server ALIAS` may be
 placed before or after the subcommand. `--json` is a per-command flag and must
@@ -313,6 +314,58 @@ follow the command name where supported.
 - `--json`
 
 `new` also supports `--cwd PATH` and `--name NAME`.
+
+## Shell Completion
+
+Print setup instructions for the detected shell:
+
+```bash
+t3code-threads completion
+t3code-threads completion bash
+t3code-threads completion zsh
+t3code-threads completion fish
+```
+
+Enable completion only for the current shell:
+
+```bash
+source <(t3code-threads completion script bash)
+source <(t3code-threads completion script zsh)
+t3code-threads completion script fish | source
+```
+
+For permanent bash setup, generate a static completion file and source it from
+`~/.bashrc`:
+
+```bash
+mkdir -p ~/.local/share/t3code-threads
+t3code-threads completion script bash > ~/.local/share/t3code-threads/completion.bash
+printf '\nsource ~/.local/share/t3code-threads/completion.bash\n' >> ~/.bashrc
+```
+
+For permanent zsh setup:
+
+```bash
+mkdir -p ~/.local/share/t3code-threads
+t3code-threads completion script zsh > ~/.local/share/t3code-threads/completion.zsh
+printf '\nsource ~/.local/share/t3code-threads/completion.zsh\n' >> ~/.zshrc
+```
+
+For permanent fish setup:
+
+```fish
+mkdir -p ~/.config/fish/completions
+t3code-threads completion script fish > ~/.config/fish/completions/t3code-threads.fish
+```
+
+Regenerate the completion file after upgrading `t3code-threads`.
+
+Completions suggest command names, nested subcommands, option names, static
+values such as `--sort updated|created`, `--items summary|full|none`,
+`--role user|assistant`, `--runtime-mode approval-required|auto-accept-edits|full-access`,
+`--interaction-mode default|plan`, shell names for `completion`, and local
+configured server aliases for `--server`. Completion does not connect to T3, so
+providers, models, projects, thread IDs, and turn IDs are not completed.
 
 When creating a thread, `new` defaults to `--runtime-mode full-access` and
 `--interaction-mode default`. Pass `--runtime-mode approval-required` when the
