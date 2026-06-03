@@ -407,7 +407,8 @@ export function terminalStatus(
   observedTurnId?: string | null,
 ): TurnWaitResult["status"] | null {
   if (messageId) return terminalStatusAfterMessage(thread, messageId, observedTurnId);
-  if (thread.session?.status === "running" || thread.session?.status === "starting") return null;
+  const sessionStatus = thread.session?.status;
+  if (sessionStatus === "running" || sessionStatus === "starting") return null;
   switch (thread.latestTurn?.state) {
     case "completed":
       return "completed";
@@ -416,8 +417,9 @@ export function terminalStatus(
     case "error":
       return "error";
     default:
-      if (thread.session?.status === "interrupted") return "interrupted";
-      if (thread.session?.status === "error") return "error";
+      if (sessionStatus === "interrupted" || sessionStatus === "stopped") return "interrupted";
+      if (sessionStatus === "error" || thread.session?.lastError) return "error";
+      if (sessionStatus === "ready") return "completed";
       return null;
   }
 }

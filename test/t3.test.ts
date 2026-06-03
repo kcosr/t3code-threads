@@ -272,6 +272,19 @@ describe("t3 helpers", () => {
     expect(terminalStatus(completed, "message-new-user", "turn-new")).toBe("completed");
   });
 
+  test("reports idle session terminal states for thread-level waits", () => {
+    const ready = threadFixture({ session: sessionFixture("ready"), messages: [] });
+    const readyWithError = threadFixture({
+      session: sessionFixture("ready", undefined, "provider failed before latest turn"),
+      messages: [],
+    });
+    const stopped = threadFixture({ session: sessionFixture("stopped"), messages: [] });
+
+    expect(terminalStatus(ready)).toBe("completed");
+    expect(terminalStatus(readyWithError)).toBe("error");
+    expect(terminalStatus(stopped)).toBe("interrupted");
+  });
+
   test("reduces mock assistant message events", () => {
     const thread = {
       id: "thread-1",

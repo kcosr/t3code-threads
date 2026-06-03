@@ -452,8 +452,9 @@ bun run verify
 adds mock smoke plus bundle and executable builds.
 
 The mock smoke test starts a minimal fake T3 HTTP/WebSocket server and exercises
-the CLI against it. The simple WebSocket runtime path is only a mock/smoke-test
-double; production uses upstream T3's Effect RPC client runtime.
+the CLI against it, including completed, interrupted, errored, and terminal
+event-missing wait paths. The simple WebSocket runtime path is only a
+mock/smoke-test double; production uses upstream T3's Effect RPC client runtime.
 
 Live smoke checks are opt-in:
 
@@ -475,8 +476,9 @@ cd "$T3CODE_THREADS_DIR"
 T3CODE_THREADS_LIVE_START=1 bun run smoke:live
 ```
 
-By default, live smoke avoids sending a model prompt. Set `RUN_TURN=1` to create
-a prompted turn with the configured provider and wait for completion:
+By default, live smoke avoids sending model prompts. Set `RUN_TURN=1` to run two
+real provider turns, verify streamed output, check recent message history, and
+verify `wait --json` on the completed thread:
 
 ```bash
 RUN_TURN=1 bun run smoke:live

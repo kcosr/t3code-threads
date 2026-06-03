@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 
 type WsData = { readonly id: string };
 type JsonRecord = Record<string, unknown>;
+type ThreadSubscriber = {
+  readonly ws: Bun.ServerWebSocket<WsData>;
+  readonly requestId: string;
+};
 type SmokeThread = JsonRecord & {
   readonly id: string;
   readonly projectId: string;
@@ -27,6 +31,7 @@ type SmokeThread = JsonRecord & {
 
 const now = "2026-06-02T12:00:00.000Z";
 let sequence = 1;
+const threadSubscribers = new Map<string, ThreadSubscriber>();
 const project = {
   id: "project-smoke",
   title: "smoke",
@@ -118,9 +123,14 @@ const server = Bun.serve<WsData>({
       const request = JSON.parse(text) as {
         readonly _tag?: string;
         readonly id?: string;
+        readonly requestId?: string;
         readonly tag?: string;
         readonly payload?: unknown;
       };
+      if (request._tag === "Interrupt" && request.requestId) {
+        threadSubscribers.delete(request.requestId);
+        return;
+      }
       if (request._tag !== "Request" || !request.id || !request.tag) return;
       switch (request.tag) {
         case "server.getConfig":
@@ -130,12 +140,18 @@ const server = Bun.serve<WsData>({
         case "orchestration.getArchivedShellSnapshot":
           return exit(ws, request.id, { ...shellSnapshot(), threads: thread.archivedAt ? [shellThread()] : [] });
         case "orchestration.subscribeThread":
-          return chunk(ws, request.id, [{ kind: "snapshot", snapshot: { snapshotSequence: sequence, thread } }]);
+          threadSubscribers.set(request.id, { ws, requestId: request.id });
+          return chunk(ws, request.id, [threadSnapshotItem()]);
         case "orchestration.dispatchCommand":
           applyCommand(request.payload);
           return exit(ws, request.id, { sequence });
         default:
           return exit(ws, request.id, {});
+      }
+    },
+    close(ws) {
+      for (const [requestId, subscriber] of threadSubscribers) {
+        if (subscriber.ws === ws) threadSubscribers.delete(requestId);
       }
     },
   },
@@ -176,6 +192,19 @@ try {
   await run(configPath, ["archive", "thread-smoke"]);
   await run(configPath, ["unarchive", "thread-smoke"]);
   await run(configPath, ["new", "--cwd", "/tmp/t3code-threads-smoke", "--name", "created", "--json"]);
+
+  const completed = await run(configPath, ["send", thread.id, "mock complete", "--stream"]);
+  assertIncludes(completed.stdout, "status    completed", "completed turn status");
+
+  const silent = await run(configPath, ["send", thread.id, "mock silent"]);
+  assertIncludes(silent.stdout, "status    completed", "silent ended turn status");
+
+  const interrupted = await run(configPath, ["send", thread.id, "mock interrupt"], { expectedExitCode: 1 });
+  assertIncludes(interrupted.stdout, "status    interrupted", "interrupted turn status");
+
+  const errored = await run(configPath, ["send", thread.id, "mock error"], { expectedExitCode: 1 });
+  assertIncludes(errored.stdout, "status    error", "error turn status");
+
   await rm(dir, { recursive: true, force: true });
   console.log("mock smoke ok");
 } finally {
@@ -209,6 +238,21 @@ function shellSnapshot() {
     threads: thread.archivedAt ? [] : [shellThread()],
     updatedAt: now,
   };
+}
+
+function threadSnapshotItem() {
+  return { kind: "snapshot", snapshot: { snapshotSequence: sequence, thread } };
+}
+
+function emitThreadSnapshot() {
+  const item = threadSnapshotItem();
+  for (const [requestId, subscriber] of threadSubscribers) {
+    if (subscriber.ws.readyState === WebSocket.OPEN) {
+      chunk(subscriber.ws, requestId, [item]);
+    } else {
+      threadSubscribers.delete(requestId);
+    }
+  }
 }
 
 function shellThread() {
@@ -261,7 +305,113 @@ function applyCommand(command: unknown) {
       archivedAt: null,
       updatedAt: now,
     };
+  } else if (command.type === "thread.turn.start") {
+    applyTurnStartCommand(command);
   }
+}
+
+function applyTurnStartCommand(command: JsonRecord) {
+  const message = isRecord(command.message) ? command.message : {};
+  const threadId = stringValue(command.threadId) ?? thread.id;
+  const prompt = stringValue(message.text) ?? "";
+  const messageId = stringValue(message.messageId) ?? `message-user-${sequence}`;
+  const turnId = `turn-mock-${sequence}`;
+  const createdThread = isRecord(command.bootstrap)
+    ? isRecord(command.bootstrap.createThread)
+      ? command.bootstrap.createThread
+      : undefined
+    : undefined;
+  if (createdThread) {
+    thread = {
+      ...thread,
+      id: threadId,
+      title: stringValue(createdThread.title) ?? (prompt || thread.title),
+      projectId: stringValue(createdThread.projectId) ?? thread.projectId,
+      modelSelection: isRecord(createdThread.modelSelection) ? createdThread.modelSelection : thread.modelSelection,
+      runtimeMode: stringValue(createdThread.runtimeMode) ?? thread.runtimeMode,
+      interactionMode: stringValue(createdThread.interactionMode) ?? thread.interactionMode,
+      messages: [],
+      latestTurn: null,
+      archivedAt: null,
+      updatedAt: now,
+    };
+  }
+
+  thread = {
+    ...thread,
+    id: threadId,
+    messages: [
+      ...thread.messages,
+      {
+        id: messageId,
+        role: "user",
+        text: prompt,
+        turnId: null,
+        streaming: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    latestTurn: {
+      turnId,
+      state: "running",
+      requestedAt: now,
+      startedAt: now,
+      completedAt: null,
+      assistantMessageId: null,
+    },
+    session: session("running", turnId),
+    updatedAt: now,
+  };
+  emitThreadSnapshot();
+
+  if (prompt === "mock interrupt") {
+    thread = { ...thread, latestTurn: null, session: session("interrupted"), updatedAt: now };
+  } else if (prompt === "mock error") {
+    thread = { ...thread, latestTurn: null, session: session("error", null, "mock failure"), updatedAt: now };
+  } else if (prompt === "mock silent") {
+    thread = { ...thread, latestTurn: null, session: session("ready"), updatedAt: now };
+  } else {
+    const assistantMessageId = `message-assistant-${sequence}`;
+    thread = {
+      ...thread,
+      messages: [
+        ...thread.messages,
+        {
+          id: assistantMessageId,
+          role: "assistant",
+          text: `${prompt} ok`,
+          turnId,
+          streaming: false,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      latestTurn: {
+        turnId,
+        state: "completed",
+        requestedAt: now,
+        startedAt: now,
+        completedAt: now,
+        assistantMessageId,
+      },
+      session: session("ready"),
+      updatedAt: now,
+    };
+  }
+  emitThreadSnapshot();
+}
+
+function session(status: string, activeTurnId?: string | null, lastError?: string | null): JsonRecord {
+  return {
+    threadId: thread.id,
+    status,
+    providerName: "codex",
+    runtimeMode: "full-access",
+    activeTurnId: activeTurnId ?? null,
+    lastError: lastError ?? null,
+    updatedAt: now,
+  };
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -280,7 +430,7 @@ function exit(ws: Bun.ServerWebSocket<WsData>, requestId: string, value: unknown
   ws.send(JSON.stringify({ _tag: "Exit", requestId, exit: { _tag: "Success", value } }));
 }
 
-async function run(configPath: string, args: string[]) {
+async function run(configPath: string, args: string[], options: { readonly expectedExitCode?: number } = {}) {
   const proc = Bun.spawn({
     cmd: ["bun", "run", "src/index.ts", "--config", configPath, ...args],
     cwd: new URL("..", import.meta.url).pathname,
@@ -293,9 +443,17 @@ async function run(configPath: string, args: string[]) {
     new Response(proc.stderr).text(),
     proc.exited,
   ]);
-  if (exitCode !== 0) {
+  const expectedExitCode = options.expectedExitCode ?? 0;
+  if (exitCode !== expectedExitCode) {
     console.error(stdout);
     console.error(stderr);
-    throw new Error(`command failed (${exitCode}): ${args.join(" ")}`);
+    throw new Error(`command exited ${exitCode}, expected ${expectedExitCode}: ${args.join(" ")}`);
+  }
+  return { stdout, stderr, exitCode };
+}
+
+function assertIncludes(value: string, expected: string, label: string) {
+  if (!value.includes(expected)) {
+    throw new Error(`${label} did not include ${JSON.stringify(expected)}:\n${value}`);
   }
 }

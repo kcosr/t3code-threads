@@ -1,7 +1,8 @@
 # Smoke Tests
 
 `mock-smoke.ts` starts a small fake T3 HTTP/WebSocket server and exercises the
-CLI command path without requiring a real provider.
+CLI command path without requiring a real provider. It covers basic commands
+plus completed, interrupted, errored, and terminal event-missing wait paths.
 
 ```bash
 bun run smoke:mock
@@ -16,7 +17,8 @@ export T3CODE_THREADS_LIVE_TOKEN=...
 bun run smoke:live
 ```
 
-Set `RUN_TURN=1` to send a real prompt to the configured provider.
+Set `RUN_TURN=1` to run two real provider turns, verify streamed output, check
+recent message history, and verify `wait --json` on the completed thread.
 
 It can also start upstream T3 from an installed checkout:
 

@@ -36,6 +36,17 @@ run() {
   "$@"
 }
 
+assert_contains() {
+  local value="$1"
+  local expected="$2"
+  local label="$3"
+  if ! grep -Fq "$expected" <<<"$value"; then
+    echo "$label did not include: $expected" >&2
+    echo "$value" >&2
+    exit 1
+  fi
+}
+
 json_escape() {
   bun -e 'console.log(JSON.stringify(process.argv.at(-1)).slice(1, -1))' "$1"
 }
@@ -105,7 +116,34 @@ run bun run src/index.ts --config "$CONFIG" archive --server live "$THREAD_ID"
 run bun run src/index.ts --config "$CONFIG" unarchive --server live "$THREAD_ID"
 
 if [ "$RUN_TURN" = "1" ]; then
-  run bun run src/index.ts --config "$CONFIG" send --server live "$THREAD_ID" "Reply with exactly: t3code-threads live smoke ok" --stream
+  FIRST_TURN="$(
+    run bun run src/index.ts --config "$CONFIG" send --server live "$THREAD_ID" \
+      "Reply with exactly: t3code-threads live smoke ok" --stream
+  )"
+  assert_contains "$FIRST_TURN" "t3code-threads live smoke ok" "first live turn"
+  assert_contains "$FIRST_TURN" "status    completed" "first live turn status"
+
+  SECOND_TURN="$(
+    run bun run src/index.ts --config "$CONFIG" send --server live "$THREAD_ID" \
+      "Reply with exactly: t3code-threads live smoke followup ok" --stream
+  )"
+  assert_contains "$SECOND_TURN" "t3code-threads live smoke followup ok" "second live turn"
+  assert_contains "$SECOND_TURN" "status    completed" "second live turn status"
+
+  HISTORY="$(run bun run src/index.ts --config "$CONFIG" messages --server live "$THREAD_ID" --last 4)"
+  assert_contains "$HISTORY" "t3code-threads live smoke ok" "live message history"
+  assert_contains "$HISTORY" "t3code-threads live smoke followup ok" "live message history"
+
+  WAIT_JSON="$(run bun run src/index.ts --config "$CONFIG" wait --server live "$THREAD_ID" --json)"
+  printf '%s' "$WAIT_JSON" | bun -e '
+    let s = "";
+    for await (const c of Bun.stdin.stream()) s += Buffer.from(c).toString();
+    const parsed = JSON.parse(s);
+    if (parsed.status !== "completed") {
+      console.error(`expected completed wait status, got ${parsed.status}`);
+      process.exit(1);
+    }
+  '
 fi
 
 echo "live smoke ok"
