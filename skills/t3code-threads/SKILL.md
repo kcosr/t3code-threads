@@ -21,7 +21,8 @@ not pass `--connect` unless debugging or explicitly targeting another server.
 T3 server must already be running, for example:
 
 ```bash
-cd /home/kevin/worktrees/t3code
+T3CODE_DIR=/path/to/t3code
+cd "$T3CODE_DIR"
 bun install
 cd apps/server
 bun run src/bin.ts serve --host 127.0.0.1 --port 3773 /path/to/project
@@ -79,7 +80,7 @@ For an agent, prefer this split:
 Example:
 
 ```bash
-t3code-threads search --json --limit 10 "release process" \
+t3code-threads search "release process" --json --limit 10 \
   | jq '{threads:[.threads[] | {id,title,projectId,updatedAt}]}'
 
 t3code-threads messages <thread_id> --last 6
@@ -100,7 +101,7 @@ Group by project/workspace when summarizing:
 
 ```bash
 t3code-threads list --since 24h --limit 100 --json \
-  | jq -r '.threads[] | [.updatedAt, .id, (.title // ""), (.projectId // ""), (.status // "")] | @tsv'
+  | jq -r '.threads[] | [.updatedAt, .id, (.title // ""), (.projectId // ""), (.session.status // .latestTurn.state // "idle")] | @tsv'
 ```
 
 Before sending a follow-up, check whether the thread is active:
@@ -148,7 +149,7 @@ t3code-threads send <thread_id> "$(cat /tmp/t3code-followup.txt)" --json
 Always pass an absolute cwd:
 
 ```bash
-t3code-threads new --cwd /home/kevin/worktrees/<repo> "Prompt here"
+t3code-threads new --cwd /path/to/repo "Prompt here"
 ```
 
 Optional flags:
@@ -166,6 +167,10 @@ Optional flags:
 --json
 ```
 
+When creating a thread, `--runtime-mode` defaults to `full-access` and
+`--interaction-mode` defaults to `default`. Pass
+`--runtime-mode approval-required` when the new thread should require approvals.
+
 `new --cwd PATH` without a prompt creates a thread only. `--stream` and
 `--no-wait` require a prompt.
 
@@ -175,13 +180,13 @@ Recent thread list:
 
 ```bash
 t3code-threads list --limit 20 --json \
-  | jq '{threads:[.threads[] | {id,title,projectId,updatedAt,status}]}'
+  | jq '{threads:[.threads[] | {id,title,projectId,updatedAt,status:(.session.status // .latestTurn.state // "idle")}]}'
 ```
 
 Search results:
 
 ```bash
-t3code-threads search --limit 10 --json "query" \
+t3code-threads search "query" --limit 10 --json \
   | jq '{threads:[.threads[] | {id,title,projectId,updatedAt}]}'
 ```
 

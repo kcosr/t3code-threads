@@ -21,9 +21,11 @@ Set `RUN_TURN=1` to send a real prompt to the configured provider.
 It can also start upstream T3 from an installed checkout:
 
 ```bash
-cd /home/kevin/worktrees/t3code
+T3CODE_DIR=/path/to/t3code
+T3CODE_THREADS_DIR=/path/to/t3code-threads
+cd "$T3CODE_DIR"
 bun install --filter t3 --ignore-scripts --no-progress
-cd /home/kevin/worktrees/t3code-threads
+cd "$T3CODE_THREADS_DIR"
 T3CODE_THREADS_LIVE_START=1 bun run smoke:live
 ```
 

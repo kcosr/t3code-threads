@@ -25,9 +25,9 @@ T3 and it does not maintain a local thread database.
 - Provider instance, model, reasoning effort, service tier, runtime mode, and
   interaction mode flags where upstream T3 supports them.
 - T3 project/provider/model inspection commands.
-- Thread naming, archive/unarchive, active-turn interrupt, session stop, and
-  unsupported-gap reporting for concepts that upstream T3 does not expose, such
-  as active-turn steering and thread goals.
+- Thread naming, archive/unarchive, active-turn interrupt, and session stop.
+- Documented gaps for concepts upstream T3 does not expose, such as active-turn
+  steering and thread goals.
 - Mock and live smoke harnesses.
 - Standalone Bun executable builds for local and release use.
 
@@ -84,6 +84,10 @@ When asking another agent to use this CLI, point it at the included skill:
 skills/t3code-threads
 ```
 
+Before running the commands below, start T3 and configure a bearer token. The
+example config expects the token in `T3CODE_THREADS_TOKEN`; see Starting T3 and
+Auth for setup details.
+
 Create a config:
 
 ```bash
@@ -127,7 +131,8 @@ t3code-threads --server local list --since 24h --limit 20
 Start upstream T3:
 
 ```bash
-cd /home/kevin/worktrees/t3code
+T3CODE_DIR=/path/to/t3code
+cd "$T3CODE_DIR"
 bun install
 cd apps/server
 bun run src/bin.ts serve --host 127.0.0.1 --port 3773 /path/to/project
@@ -273,7 +278,7 @@ unless explicit provider/model/runtime flags are passed.
 | `projects add PATH [--title TITLE] [--create] [--json]` | Add a T3 project. |
 | `providers list [--json]` | List provider instances and auth/install status. |
 | `models [--provider INSTANCE] [--json]` | List models, optionally filtered by provider instance. |
-| `list` | List threads with `--limit`, `--since`, `--cwd`, `--archived`, `--sort`, `--asc`, `--desc`, `--json`. |
+| `list` | List threads with `--limit`, `--since`, `--cwd`, `--archived`, `--sort updated\|created`, `--asc`, `--json`. |
 | `search QUERY` | Client-side search over loaded thread snapshots with list filters. |
 | `show THREAD_ID` | Show thread detail and messages with `--last`, `--asc`, `--desc`, `--items summary\|full\|none`, `--json`. |
 | `messages THREAD_ID` | Flatten user/assistant messages with `--last`, `--since`, `--role user\|assistant`, `--json`. |
@@ -288,9 +293,9 @@ unless explicit provider/model/runtime flags are passed.
 | `archive THREAD_ID` / `unarchive THREAD_ID` | Archive or restore a thread. |
 | `settings show THREAD_ID` | Show T3 thread model/runtime settings. |
 
-Every T3 command accepts global `--config PATH`, `--server ALIAS`, and `--json`
-where the command supports JSON output. Global options may be placed before or
-after the subcommand.
+Global options `--config PATH`, `--connect URL`, and `--server ALIAS` may be
+placed before or after the subcommand. `--json` is a per-command flag and must
+follow the command name where supported.
 
 `new` and `send` support:
 
@@ -305,6 +310,11 @@ after the subcommand.
 - `--json`
 
 `new` also supports `--cwd PATH` and `--name NAME`.
+
+When creating a thread, `new` defaults to `--runtime-mode full-access` and
+`--interaction-mode default`. Pass `--runtime-mode approval-required` when the
+new thread should require approvals. Follow-up `send` commands inherit the
+thread's current runtime and interaction modes unless explicit flags are passed.
 
 ## Output
 
@@ -336,6 +346,10 @@ as a fallback so callers still get a final response if an event is missed.
 thread is idle and its latest turn is already completed, they return
 `completed` immediately; they do not tail future turns indefinitely.
 
+A thread runs turns. The provider session is the live process backing that
+thread. `interrupt` cancels the in-flight turn; `stop` ends the provider session
+for the thread.
+
 Exit codes:
 
 | Code | Meaning |
@@ -350,9 +364,10 @@ timestamp in seconds or a relative duration ending in `s`, `m`, `h`, `d`, or
 `w`, such as `5m`. List and search filtering is applied client-side to T3
 snapshots.
 
-`search` loads each candidate thread detail and searches title plus message
-text. If an individual thread detail cannot be loaded, search continues and
-reports `skippedThreads` in JSON output or a warning in human output.
+`search` loads thread detail snapshots, searches title plus message text, then
+applies list filters. If an individual thread detail cannot be loaded, search
+continues and reports `skippedThreads` in JSON output or a warning in human
+output.
 
 `messages` is a convenience projection over the current T3 thread snapshot. It
 filters to user/assistant messages, applies `--since` and `--role`, then applies
@@ -449,9 +464,11 @@ The live smoke harness can also start upstream T3 itself from an installed
 checkout:
 
 ```bash
-cd /home/kevin/worktrees/t3code
+T3CODE_DIR=/path/to/t3code
+T3CODE_THREADS_DIR=/path/to/t3code-threads
+cd "$T3CODE_DIR"
 bun install --filter t3 --ignore-scripts --no-progress
-cd /home/kevin/worktrees/t3code-threads
+cd "$T3CODE_THREADS_DIR"
 T3CODE_THREADS_LIVE_START=1 bun run smoke:live
 ```
 
