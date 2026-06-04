@@ -21,6 +21,8 @@ import {
   saveConfig,
   setServerToken,
 } from "./config.ts";
+import { INTERACTION_MODES, RUNTIME_MODES } from "./choices.ts";
+import type { BaseInput, CommandRunner } from "./command-runner.ts";
 import { UsageError } from "./errors.ts";
 import { commandId, messageId, projectId, threadId } from "./ids.ts";
 import { printJson, printKeyValues, printMessages, printTable } from "./render.ts";
@@ -42,25 +44,9 @@ import { isAtOrAfter, nowIso, parseSince } from "./time.ts";
 import type { AppConfig, ResolvedTarget, T3Connection } from "./types.ts";
 import { requireArg, requireNoExtra, takeFlag, takeNumber, takeOption } from "./args.ts";
 
-const RUNTIME_MODES = [
-  "approval-required",
-  "auto-accept-edits",
-  "full-access",
-] as const satisfies ReadonlyArray<RuntimeMode>;
-const INTERACTION_MODES = ["default", "plan"] as const satisfies ReadonlyArray<ProviderInteractionMode>;
 const SEARCH_DETAIL_CONCURRENCY = 12;
 
-interface BaseInput {
-  readonly configPath?: string;
-  readonly connect?: string;
-  readonly server?: string;
-}
-
-export async function runCommand(command: string, rawArgs: ReadonlyArray<string>, base: BaseInput): Promise<number> {
-  if (command === "help") {
-    printHelp();
-    return 0;
-  }
+export const runCommand: CommandRunner = async (command, rawArgs, base) => {
   const configPath = resolveConfigPath(base.configPath);
   const config = await loadConfig(configPath);
   switch (command) {
@@ -107,7 +93,7 @@ export async function runCommand(command: string, rawArgs: ReadonlyArray<string>
     default:
       throw new UsageError(`unknown command ${command}`);
   }
-}
+};
 
 async function serversCommand(args: string[], config: AppConfig, configPath: string, base: BaseInput): Promise<number> {
   const sub = args[0];
@@ -420,6 +406,7 @@ async function messagesCommand(args: string[], config: AppConfig, base: BaseInpu
 }
 
 async function newCommand(args: string[], config: AppConfig, base: BaseInput): Promise<number> {
+  const positionals = takeSentinelPositionals(args);
   const json = takeFlag(args, "--json");
   const stream = takeFlag(args, "--stream");
   const noWait = takeFlag(args, "--no-wait");
@@ -431,7 +418,8 @@ async function newCommand(args: string[], config: AppConfig, base: BaseInput): P
   const serviceTier = takeOption(args, "--service-tier");
   const runtimeMode = parseRuntimeMode(takeOption(args, "--runtime-mode"), "full-access");
   const interactionMode = parseInteractionMode(takeOption(args, "--interaction-mode"), "default");
-  const prompt = args.shift();
+  const prompt = positionals.shift() ?? args.shift();
+  args.push(...positionals);
   requireNoExtra(args);
   if (!prompt && (stream || noWait)) throw new UsageError("new without PROMPT cannot use --stream or --no-wait");
   return await withConnection(config, base, async (connection) => {
@@ -615,8 +603,10 @@ async function waitCommand(args: string[], config: AppConfig, base: BaseInput): 
 }
 
 async function statusCommand(args: string[], config: AppConfig, base: BaseInput): Promise<number> {
+  const positionals = takeSentinelPositionals(args);
   const json = takeFlag(args, "--json");
-  const threadArg = args.shift();
+  const threadArg = positionals.shift() ?? args.shift();
+  args.push(...positionals);
   requireNoExtra(args);
   return await withConnection(config, base, async (connection) => {
     if (threadArg) {
@@ -781,6 +771,12 @@ function listOptions(args: string[]) {
   return { json, archived, asc, limit, cwd, sort, since };
 }
 
+function takeSentinelPositionals(args: string[]): string[] {
+  const index = args.indexOf("--");
+  if (index < 0) return [];
+  return args.splice(index).slice(1);
+}
+
 function filterThreads(
   threads: ReadonlyArray<OrchestrationThreadShell>,
   options: ReturnType<typeof listOptions>,
@@ -922,34 +918,4 @@ function promptTitle(prompt: string | undefined): string | undefined {
   if (!prompt) return undefined;
   const normalized = prompt.replace(/\s+/g, " ").trim();
   return normalized.length > 60 ? `${normalized.slice(0, 57)}...` : normalized || undefined;
-}
-
-function printHelp(): void {
-  process.stdout.write(`t3code-threads
-
-Usage:
-  t3code-threads [--config PATH] [--server ALIAS|--connect URL] COMMAND
-
-Commands:
-  servers [ping]          List or ping configured T3 servers
-  auth status|login       Manage bearer auth for a server
-  projects list|add       List or add T3 projects
-  providers list          List provider instances
-  models                  List provider models
-  list                    List threads
-  search QUERY            Search thread titles/messages
-  show THREAD             Show thread detail
-  messages THREAD         Show flattened messages
-  new --cwd PATH [PROMPT] Create a thread and optionally start a turn
-  send THREAD PROMPT      Start a follow-up turn
-  follow THREAD           Follow an active turn
-  wait THREAD             Wait for an active turn to finish
-  status [THREAD]         Show active session status
-  interrupt THREAD [TURN] Interrupt the active turn
-  stop THREAD             Stop the provider session
-  name THREAD NAME        Rename a thread
-  archive THREAD          Archive a thread
-  unarchive THREAD        Restore a thread
-  settings show THREAD    Show T3 thread settings
-`);
 }
