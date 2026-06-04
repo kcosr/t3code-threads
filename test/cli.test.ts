@@ -48,6 +48,17 @@ describe("cli parser", () => {
     ]);
   });
 
+  test("preserves optional status thread tokens that look like flags", async () => {
+    const calls = await parse(["status", "--", "--json"]);
+    expect(calls).toEqual([
+      {
+        command: "status",
+        args: ["--", "--json"],
+        base: {},
+      },
+    ]);
+  });
+
   test("parses representative commands", async () => {
     const cases: ReadonlyArray<[ReadonlyArray<string>, RunnerCall]> = [
       [["servers"], { command: "servers", args: [], base: {} }],
@@ -121,7 +132,7 @@ describe("cli parser", () => {
       ],
       [["follow", "thread-1", "--json"], { command: "follow", args: ["thread-1", "--json"], base: {} }],
       [["wait", "thread-1", "--json"], { command: "wait", args: ["thread-1", "--json"], base: {} }],
-      [["status", "thread-1", "--json"], { command: "status", args: ["--json", "thread-1"], base: {} }],
+      [["status", "thread-1", "--json"], { command: "status", args: ["--", "thread-1", "--json"], base: {} }],
       [
         ["interrupt", "thread-1", "turn-1", "--json"],
         {

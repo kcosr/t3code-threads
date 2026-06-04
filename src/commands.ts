@@ -617,6 +617,7 @@ async function waitCommand(args: string[], config: AppConfig, base: BaseInput): 
 }
 
 async function statusCommand(args: string[], config: AppConfig, base: BaseInput): Promise<number> {
+  if (args[0] === "--") args.shift();
   const json = takeFlag(args, "--json");
   const threadArg = args.shift();
   requireNoExtra(args);

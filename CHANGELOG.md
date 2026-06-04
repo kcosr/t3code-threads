@@ -16,7 +16,8 @@
 ### Fixed
 
 - Improved release-script preflight checks, diagnostics, and changelog validation edge cases.
-- Preserve `new -- --json` and similar prompt values that look like flags.
+- Preserve `new -- --json`, `status -- --json`, and similar positional values
+  that look like flags.
 
 ## [0.1.0] - 2026-06-03
 
