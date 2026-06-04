@@ -5,19 +5,21 @@
 ### Added
 
 - Add shell completion setup and generated bash, zsh, and fish completion
-  scripts.
+  scripts. ([#1](https://github.com/kcosr/t3code-threads/pull/1))
 
 ### Changed
 
 - Migrate CLI command parsing to Commander while preserving practical placement
   for global `--config`, `--connect`, and `--server` options.
+  ([#1](https://github.com/kcosr/t3code-threads/pull/1))
 - Render CLI help through Commander.
+  ([#1](https://github.com/kcosr/t3code-threads/pull/1))
 
 ### Fixed
 
 - Improved release-script preflight checks, diagnostics, and changelog validation edge cases.
 - Preserve `new -- --json`, `status -- --json`, and similar positional values
-  that look like flags.
+  that look like flags. ([#1](https://github.com/kcosr/t3code-threads/pull/1))
 
 ## [0.1.0] - 2026-06-03
 
