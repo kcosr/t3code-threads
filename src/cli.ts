@@ -289,7 +289,7 @@ function configureNewCommand(root: Command, runner: CommandRunner): void {
       ...modelOptions(options),
       ...option("--runtime-mode", options.runtimeMode),
       ...option("--interaction-mode", options.interactionMode),
-      ...positional(prompt),
+      ...sentinelPositional(prompt),
     ]);
   });
 }
@@ -434,11 +434,15 @@ function option(flag: string, value: unknown): string[] {
 }
 
 function noWaitFlag(options: Options): string[] {
-  return options.noWait || options.wait === false ? ["--no-wait"] : [];
+  return options.wait === false ? ["--no-wait"] : [];
 }
 
 function positional(value: string | undefined): string[] {
   return value === undefined ? [] : [value];
+}
+
+function sentinelPositional(value: string | undefined): string[] {
+  return value === undefined ? [] : ["--", value];
 }
 
 function kebab(value: string): string {

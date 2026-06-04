@@ -11,10 +11,12 @@
 
 - Migrate CLI command parsing to Commander while preserving practical placement
   for global `--config`, `--connect`, and `--server` options.
+- Render CLI help through Commander.
 
 ### Fixed
 
 - Improved release-script preflight checks, diagnostics, and changelog validation edge cases.
+- Preserve `new -- --json` and similar prompt values that look like flags.
 
 ## [0.1.0] - 2026-06-03
 

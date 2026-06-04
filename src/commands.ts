@@ -62,10 +62,6 @@ export interface BaseInput {
 export type CommandRunner = (command: string, rawArgs: ReadonlyArray<string>, base: BaseInput) => Promise<number>;
 
 export const runCommand: CommandRunner = async (command, rawArgs, base) => {
-  if (command === "help") {
-    printHelp();
-    return 0;
-  }
   const configPath = resolveConfigPath(base.configPath);
   const config = await loadConfig(configPath);
   switch (command) {
@@ -436,6 +432,7 @@ async function newCommand(args: string[], config: AppConfig, base: BaseInput): P
   const serviceTier = takeOption(args, "--service-tier");
   const runtimeMode = parseRuntimeMode(takeOption(args, "--runtime-mode"), "full-access");
   const interactionMode = parseInteractionMode(takeOption(args, "--interaction-mode"), "default");
+  if (args[0] === "--") args.shift();
   const prompt = args.shift();
   requireNoExtra(args);
   if (!prompt && (stream || noWait)) throw new UsageError("new without PROMPT cannot use --stream or --no-wait");
@@ -927,34 +924,4 @@ function promptTitle(prompt: string | undefined): string | undefined {
   if (!prompt) return undefined;
   const normalized = prompt.replace(/\s+/g, " ").trim();
   return normalized.length > 60 ? `${normalized.slice(0, 57)}...` : normalized || undefined;
-}
-
-function printHelp(): void {
-  process.stdout.write(`t3code-threads
-
-Usage:
-  t3code-threads [--config PATH] [--server ALIAS|--connect URL] COMMAND
-
-Commands:
-  servers [ping]          List or ping configured T3 servers
-  auth status|login       Manage bearer auth for a server
-  projects list|add       List or add T3 projects
-  providers list          List provider instances
-  models                  List provider models
-  list                    List threads
-  search QUERY            Search thread titles/messages
-  show THREAD             Show thread detail
-  messages THREAD         Show flattened messages
-  new --cwd PATH [PROMPT] Create a thread and optionally start a turn
-  send THREAD PROMPT      Start a follow-up turn
-  follow THREAD           Follow an active turn
-  wait THREAD             Wait for an active turn to finish
-  status [THREAD]         Show active session status
-  interrupt THREAD [TURN] Interrupt the active turn
-  stop THREAD             Stop the provider session
-  name THREAD NAME        Rename a thread
-  archive THREAD          Archive a thread
-  unarchive THREAD        Restore a thread
-  settings show THREAD    Show T3 thread settings
-`);
 }

@@ -37,6 +37,17 @@ describe("cli parser", () => {
     ]);
   });
 
+  test("preserves optional prompt tokens that look like flags", async () => {
+    const calls = await parse(["new", "--", "--json"]);
+    expect(calls).toEqual([
+      {
+        command: "new",
+        args: ["--", "--json"],
+        base: {},
+      },
+    ]);
+  });
+
   test("parses representative commands", async () => {
     const cases: ReadonlyArray<[ReadonlyArray<string>, RunnerCall]> = [
       [["servers"], { command: "servers", args: [], base: {} }],
