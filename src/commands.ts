@@ -406,6 +406,7 @@ async function messagesCommand(args: string[], config: AppConfig, base: BaseInpu
 }
 
 async function newCommand(args: string[], config: AppConfig, base: BaseInput): Promise<number> {
+  const positionals = takeSentinelPositionals(args);
   const json = takeFlag(args, "--json");
   const stream = takeFlag(args, "--stream");
   const noWait = takeFlag(args, "--no-wait");
@@ -417,8 +418,8 @@ async function newCommand(args: string[], config: AppConfig, base: BaseInput): P
   const serviceTier = takeOption(args, "--service-tier");
   const runtimeMode = parseRuntimeMode(takeOption(args, "--runtime-mode"), "full-access");
   const interactionMode = parseInteractionMode(takeOption(args, "--interaction-mode"), "default");
-  if (args[0] === "--") args.shift();
-  const prompt = args.shift();
+  const prompt = positionals.shift() ?? args.shift();
+  args.push(...positionals);
   requireNoExtra(args);
   if (!prompt && (stream || noWait)) throw new UsageError("new without PROMPT cannot use --stream or --no-wait");
   return await withConnection(config, base, async (connection) => {
@@ -602,9 +603,10 @@ async function waitCommand(args: string[], config: AppConfig, base: BaseInput): 
 }
 
 async function statusCommand(args: string[], config: AppConfig, base: BaseInput): Promise<number> {
-  if (args[0] === "--") args.shift();
+  const positionals = takeSentinelPositionals(args);
   const json = takeFlag(args, "--json");
-  const threadArg = args.shift();
+  const threadArg = positionals.shift() ?? args.shift();
+  args.push(...positionals);
   requireNoExtra(args);
   return await withConnection(config, base, async (connection) => {
     if (threadArg) {
@@ -767,6 +769,12 @@ function listOptions(args: string[]) {
   const sort = takeOption(args, "--sort") ?? "updated";
   const since = parseSince(takeOption(args, "--since"));
   return { json, archived, asc, limit, cwd, sort, since };
+}
+
+function takeSentinelPositionals(args: string[]): string[] {
+  const index = args.indexOf("--");
+  if (index < 0) return [];
+  return args.splice(index).slice(1);
 }
 
 function filterThreads(

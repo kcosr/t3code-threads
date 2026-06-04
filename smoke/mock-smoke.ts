@@ -261,6 +261,22 @@ try {
   await run(configPath, ["unarchive", "thread-smoke"]);
   await run(configPath, ["new", "--cwd", "/tmp/t3code-threads-smoke", "--name", "created", "--json"]);
 
+  const flagPrompt = await run(configPath, [
+    "new",
+    "--cwd",
+    "/tmp/t3code-threads-smoke",
+    "--name",
+    "flag prompt",
+    "--json",
+    "--no-wait",
+    "--",
+    "--stream",
+  ]);
+  const flagPromptThreadId = stringValue((JSON.parse(flagPrompt.stdout) as JsonRecord).threadId);
+  if (!flagPromptThreadId) throw new Error("flag prompt command did not return threadId");
+  const flagPromptMessages = await run(configPath, ["messages", flagPromptThreadId, "--json"]);
+  assertIncludes(flagPromptMessages.stdout, '"text": "--stream"', "flag-like prompt text");
+
   const completed = await run(configPath, ["send", thread.id, "mock complete", "--stream"]);
   assertIncludes(completed.stdout, "status    completed", "completed turn status");
 
