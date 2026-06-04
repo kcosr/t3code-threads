@@ -274,6 +274,10 @@ try {
   ]);
   const flagPromptThreadId = stringValue((JSON.parse(flagPrompt.stdout) as JsonRecord).threadId);
   if (!flagPromptThreadId) throw new Error("flag prompt command did not return threadId");
+  const flagPromptStatus = JSON.parse(
+    (await run(configPath, ["status", flagPromptThreadId, "--json"])).stdout,
+  ) as JsonRecord;
+  assertEquals(stringValue(flagPromptStatus.threadId) ?? "", flagPromptThreadId, "status thread json");
   const flagPromptMessages = await run(configPath, ["messages", flagPromptThreadId, "--json"]);
   assertIncludes(flagPromptMessages.stdout, '"text": "--stream"', "flag-like prompt text");
 

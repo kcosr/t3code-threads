@@ -328,7 +328,7 @@ function configureThreadCommands(root: Command, runner: CommandRunner): void {
     .argument("[thread]", "thread id")
     .option("--json", "emit JSON");
   status.action(async (thread?: string) => {
-    await run(root, runner, "status", [...sentinelPositional(thread), ...flags(status.opts(), ["json"])]);
+    await run(root, runner, "status", [...flags(status.opts(), ["json"]), ...sentinelPositional(thread)]);
   });
 
   const interrupt = root

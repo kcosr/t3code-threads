@@ -132,7 +132,7 @@ describe("cli parser", () => {
       ],
       [["follow", "thread-1", "--json"], { command: "follow", args: ["thread-1", "--json"], base: {} }],
       [["wait", "thread-1", "--json"], { command: "wait", args: ["thread-1", "--json"], base: {} }],
-      [["status", "thread-1", "--json"], { command: "status", args: ["--", "thread-1", "--json"], base: {} }],
+      [["status", "thread-1", "--json"], { command: "status", args: ["--json", "--", "thread-1"], base: {} }],
       [
         ["interrupt", "thread-1", "turn-1", "--json"],
         {
