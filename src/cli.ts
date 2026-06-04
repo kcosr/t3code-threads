@@ -1,20 +1,12 @@
 import { Command, Option } from "commander";
-import {
-  type BaseInput,
-  type CommandRunner,
-  INTERACTION_MODES,
-  MESSAGE_ROLES,
-  RUNTIME_MODES,
-  SHOW_ITEM_VIEWS,
-  SORT_KEYS,
-  runCommand,
-} from "./commands.ts";
+import { INTERACTION_MODES, MESSAGE_ROLES, RUNTIME_MODES, SHOW_ITEM_VIEWS, SORT_KEYS } from "./choices.ts";
+import { type BaseInput, type CommandRunner, lazyRunCommand } from "./command-runner.ts";
 import { configureCompletionCommands } from "./completion.ts";
 import { UsageError } from "./errors.ts";
 
 type Options = Record<string, unknown>;
 
-export function configureProgram(runner: CommandRunner = runCommand): Command {
+export function configureProgram(runner: CommandRunner = lazyRunCommand): Command {
   const root = new Command();
   root
     .name("t3code-threads")

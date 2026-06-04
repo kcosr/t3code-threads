@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CommanderError } from "commander";
 import { configureProgram, hoistGlobalOptions } from "../src/cli.ts";
-import type { BaseInput, CommandRunner } from "../src/commands.ts";
+import type { BaseInput, CommandRunner } from "../src/command-runner.ts";
 import { UsageError } from "../src/errors.ts";
 
 interface RunnerCall {
