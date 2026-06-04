@@ -245,6 +245,8 @@ try {
   if ((await bashCompletion(binDir, ["t3code-threads", ""], 1)).includes("__complete")) {
     throw new Error("bash completion exposed hidden helper");
   }
+  await runOptionalShellCompletionSmoke("zsh", binDir, configPath);
+  await runOptionalShellCompletionSmoke("fish", binDir, configPath);
   await run(configPath, ["auth", "status"]);
   await run(configPath, ["models"]);
   await run(configPath, ["providers", "list"]);
@@ -551,6 +553,99 @@ async function bashCompletion(binDir: string, words: string[], cword: number): P
   return stdout;
 }
 
+async function runOptionalShellCompletionSmoke(
+  shell: "zsh" | "fish",
+  binDir: string,
+  configPath: string,
+): Promise<void> {
+  if (!(await commandExists(shell))) {
+    process.stderr.write(`warning: skipping ${shell} completion smoke; ${shell} is not installed\n`);
+    return;
+  }
+  const complete = shell === "zsh" ? zshCompletion : fishCompletion;
+  assertEquals(await complete(binDir, ["t3code-threads", "l"], 2), "list\n", `${shell} top-level completion`);
+  assertEquals(await complete(binDir, ["t3code-threads", "servers", "p"], 3), "ping\n", `${shell} nested completion`);
+  assertEquals(await complete(binDir, ["t3code-threads", "list", "--so"], 3), "--sort\n", `${shell} option completion`);
+  assertEquals(
+    await complete(binDir, ["t3code-threads", "list", "--sort", "u"], 4),
+    "updated\n",
+    `${shell} option value completion`,
+  );
+  assertEquals(
+    await complete(binDir, ["t3code-threads", "list", "--sort=u"], 3),
+    "--sort=updated\n",
+    `${shell} equals option value completion`,
+  );
+  assertEquals(
+    await complete(binDir, ["t3code-threads", "--config", configPath, "list", "--server", "mo"], 6),
+    "mock\n",
+    `${shell} server completion`,
+  );
+  if ((await complete(binDir, ["t3code-threads", ""], 2)).includes("__complete")) {
+    throw new Error(`${shell} completion exposed hidden helper`);
+  }
+}
+
+async function zshCompletion(binDir: string, words: string[], current: number): Promise<string> {
+  const script = [
+    "compdef() { :; }",
+    'compadd() { if [[ "$1" == "-a" ]]; then eval "print -rl -- \\"\\${${2}[@]}\\""; else print -rl -- "$@"; fi }',
+    "source <(t3code-threads completion script zsh)",
+    `words=(${words.map(shellQuote).join(" ")})`,
+    `CURRENT=${current}`,
+    "_t3code_threads",
+  ].join("; ");
+  return await runShellCommand(["zsh", "-fc", script], binDir, "zsh completion");
+}
+
+async function fishCompletion(binDir: string, words: string[], current: number): Promise<string> {
+  const script = [
+    "function complete; end",
+    "function commandline",
+    `  set -l current ${fishQuote(words[current - 1] ?? "")}`,
+    `  set -l words ${words.map(fishQuote).join(" ")}`,
+    '  if test "$argv[1]" = "-ct"',
+    "    printf '%s\\n' $current",
+    "  else",
+    "    printf '%s\\n' $words",
+    "  end",
+    "end",
+    "t3code-threads completion script fish | source",
+    "__t3code_threads_complete",
+  ].join("\n");
+  return await runShellCommand(["fish", "-c", script], binDir, "fish completion");
+}
+
+async function runShellCommand(cmd: string[], binDir: string, label: string): Promise<string> {
+  const proc = Bun.spawn({
+    cmd,
+    cwd: new URL("..", import.meta.url).pathname,
+    env: {
+      ...Bun.env,
+      PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
+      T3CODE_THREADS_WS_CLIENT: "simple",
+    },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode !== 0) {
+    console.error(stdout);
+    console.error(stderr);
+    throw new Error(`${label} exited ${exitCode}`);
+  }
+  return stdout;
+}
+
+async function commandExists(command: string): Promise<boolean> {
+  const proc = Bun.spawn({ cmd: ["bash", "-lc", `command -v ${command} >/dev/null 2>&1`] });
+  return (await proc.exited) === 0;
+}
+
 function assertIncludes(value: string, expected: string, label: string) {
   if (!value.includes(expected)) {
     throw new Error(`${label} did not include ${JSON.stringify(expected)}:\n${value}`);
@@ -565,4 +660,8 @@ function assertEquals(value: string, expected: string, label: string) {
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function fishQuote(value: string): string {
+  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
 }
